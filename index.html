@@ -319,8 +319,8 @@
     <h1>Every piece a step<br>Toward something worth the patience<br>What waits, waits for you</h1>
     <section class="stage" id="stage" aria-label="Image puzzle">
       <div class="video-frame" aria-hidden="true">
-        <video id="prizeVideo" playsinline controls preload="metadata">
-          <source src="assets/i-do.mp4" type="video/mp4">
+        <video id="prizeVideo" playsinline controls preload="none">
+          <source data-src="assets/i-do.mp4" type="video/mp4">
         </video>
       </div>
       <div class="puzzle-board" id="board" aria-hidden="true"></div>
@@ -361,8 +361,7 @@
     let dragOffsetX = 0;
     let dragOffsetY = 0;
 
-    source.src = VIDEO_URL;
-    video.load();
+    video.removeAttribute("src");
 
     function shuffle(items) {
       const copy = [...items];
@@ -571,6 +570,10 @@
 
     function revealPrize() {
       app.classList.add("solved");
+      if (!source.src) {
+        source.src = VIDEO_URL;
+        video.load();
+      }
       video.muted = false;
       video.volume = 1;
       video.play().catch(() => {
