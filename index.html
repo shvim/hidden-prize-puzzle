@@ -40,8 +40,12 @@
       grid-template-rows: auto minmax(0, 1fr);
       width: 100vw;
       height: 100dvh;
-      padding: clamp(18px, 3vw, 34px);
-      gap: clamp(14px, 2.2vh, 24px);
+      padding: clamp(14px, 2.4vw, 28px);
+      gap: clamp(8px, 1.2vh, 14px);
+      background-image: linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18)), url("assets/room-frame.webp");
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-size: var(--room-fit, cover);
     }
 
     h1 {
@@ -59,27 +63,24 @@
     .stage {
       position: relative;
       min-height: 0;
-      border-radius: 8px;
       overflow: hidden;
     }
 
     .video-frame,
     .celebration {
       position: absolute;
-      left: 50%;
-      top: 50%;
-      width: min(50vw, 68vh, 390px);
-      aspect-ratio: 9 / 16;
-      transform: translate(-50%, -50%);
+      left: var(--frame-left);
+      top: var(--frame-top);
+      width: var(--frame-width);
+      aspect-ratio: var(--cols) / var(--rows);
     }
 
     .puzzle-board {
       position: absolute;
-      left: 50%;
-      top: 50%;
-      width: min(58vw, 54vh, 420px);
-      aspect-ratio: 4 / 6;
-      transform: translate(-50%, -50%);
+      left: var(--frame-left);
+      top: var(--frame-top);
+      width: var(--frame-width);
+      aspect-ratio: var(--cols) / var(--rows);
     }
 
     .video-frame {
@@ -87,7 +88,7 @@
       overflow: hidden;
       border-radius: 4px;
       opacity: 0;
-      transform: translate(-50%, -50%) scale(0.98);
+      transform: scale(0.98);
       transition: opacity 850ms ease, transform 850ms ease, filter 850ms ease;
       filter: saturate(0.88) brightness(0.94);
       background: #111;
@@ -141,7 +142,7 @@
 
     .tile.locked {
       cursor: default;
-      box-shadow: 0 0 0 5px #9dff7a, 0 0 34px rgba(157, 255, 122, 0.78), var(--tile-locked-shadow);
+      box-shadow: 0 0 0 2px #9dff7a, 0 0 18px rgba(157, 255, 122, 0.62), var(--tile-locked-shadow);
       pointer-events: none;
       animation: lock-pop 360ms ease-out;
     }
@@ -157,14 +158,14 @@
       place-items: center;
       width: var(--tile-size);
       height: var(--tile-size);
-      border: 4px solid #9dff7a;
+      border: 2px solid #9dff7a;
       border-radius: 7px;
       color: #9dff7a;
       font-size: clamp(2rem, 7vw, 3.4rem);
       font-weight: 900;
       line-height: 1;
       text-shadow: 0 0 14px rgba(157, 255, 122, 0.9);
-      box-shadow: 0 0 0 5px rgba(157, 255, 122, 0.26), 0 0 38px rgba(157, 255, 122, 0.82);
+      box-shadow: 0 0 0 3px rgba(157, 255, 122, 0.22), 0 0 26px rgba(157, 255, 122, 0.72);
       pointer-events: none;
       animation: snap-burst 560ms ease-out forwards;
     }
@@ -223,13 +224,13 @@
 
     .solved .video-frame {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+      transform: scale(1);
       filter: saturate(1) brightness(1);
     }
 
     .solved .puzzle-board {
       opacity: 0;
-      transform: translate(-50%, -50%) scale(1.018);
+      transform: scale(1.018);
       filter: blur(8px);
     }
 
@@ -253,13 +254,8 @@
         gap: 10px;
       }
 
-      .video-frame,
-      .celebration {
-        width: min(82vw, 70vh, 360px);
-      }
-
-      .puzzle-board {
-        width: min(78vw, 60vh, 360px);
+      h1 {
+        font-size: clamp(1.35rem, 6.8vw, 2.35rem);
       }
     }
 
@@ -334,6 +330,7 @@
     }
 
     function updateMeasurements() {
+      updateFramePlacement();
       boardRect = board.getBoundingClientRect();
       tileSize = boardRect.width / COLS;
       document.documentElement.style.setProperty("--tile-size", `${tileSize}px`);
@@ -348,6 +345,47 @@
           placeTile(tile, boardRect.left + col * tileSize, boardRect.top + row * tileSize);
         }
       });
+    }
+
+    function updateFramePlacement() {
+      const imageRatio = 637 / 900;
+      const viewportRatio = window.innerWidth / window.innerHeight;
+      let renderWidth = window.innerWidth;
+      let renderHeight = window.innerHeight;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      const shouldContainRoom = viewportRatio > imageRatio;
+      app.style.setProperty("--room-fit", shouldContainRoom ? "contain" : "cover");
+
+      if (shouldContainRoom) {
+        renderHeight = window.innerHeight;
+        renderWidth = renderHeight * imageRatio;
+        offsetX = (window.innerWidth - renderWidth) / 2;
+      } else {
+        renderHeight = window.innerHeight;
+        renderWidth = renderHeight * imageRatio;
+        offsetX = (window.innerWidth - renderWidth) / 2;
+      }
+
+      /*
+        Frame placement: these percentages map the puzzle/video onto the empty
+        wall frame in assets/room-frame.webp. Adjust if you swap the room image.
+      */
+      const frame = {
+        left: 0.457,
+        top: 0.142,
+        width: 0.358
+      };
+
+      const stageRect = stage.getBoundingClientRect();
+      const left = offsetX + renderWidth * frame.left - stageRect.left;
+      const top = offsetY + renderHeight * frame.top - stageRect.top;
+      const width = renderWidth * frame.width;
+
+      stage.style.setProperty("--frame-left", `${left}px`);
+      stage.style.setProperty("--frame-top", `${top}px`);
+      stage.style.setProperty("--frame-width", `${width}px`);
     }
 
     function placeTile(tile, left, top) {
@@ -466,7 +504,7 @@
       lockedCount += 1;
 
       if (lockedCount === COLS * ROWS) {
-        window.setTimeout(revealPrize, 260);
+        window.setTimeout(revealPrize, 1260);
       }
     }
 
