@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hidden Prize Puzzle</title>
+  <style>
+    :root {
+      --bg: #f6f7f4;
+      --ink: #1c1d1c;
+      --muted: #7b7f78;
+      --tile-shadow: 0 14px 30px rgba(26, 28, 24, 0.18);
+      --tile-locked-shadow: 0 4px 12px rgba(26, 28, 24, 0.08);
+      --outline-color: rgba(238, 238, 238, 0.95); /* Change outline visibility/color here. */
+      --snap-glow: rgba(240, 227, 181, 0.72);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+    }
+
+    body {
+      overflow: hidden;
+      background: #000;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .app {
+      position: relative;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      width: 100vw;
+      height: 100dvh;
+      padding: clamp(18px, 3vw, 34px);
+      gap: clamp(14px, 2.2vh, 24px);
+    }
+
+    h1 {
+      z-index: 3;
+      width: min(900px, 100%);
+      margin: 0 auto;
+      color: #8f18ff;
+      font-size: clamp(1.65rem, 4vw, 3.25rem);
+      font-weight: 760;
+      letter-spacing: 0;
+      line-height: 1.12;
+      text-align: center;
+    }
+
+    .stage {
+      position: relative;
+      min-height: 0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .video-frame,
+    .celebration {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(50vw, 68vh, 390px);
+      aspect-ratio: 9 / 16;
+      transform: translate(-50%, -50%);
+    }
+
+    .puzzle-board {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(58vw, 54vh, 420px);
+      aspect-ratio: 4 / 6;
+      transform: translate(-50%, -50%);
+    }
+
+    .video-frame {
+      z-index: 0;
+      overflow: hidden;
+      border-radius: 4px;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.98);
+      transition: opacity 850ms ease, transform 850ms ease, filter 850ms ease;
+      filter: saturate(0.88) brightness(0.94);
+      background: #111;
+      box-shadow: 0 18px 48px rgba(26, 28, 24, 0.18);
+    }
+
+    .video-frame video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .puzzle-board {
+      z-index: 1;
+      border: 5px solid var(--outline-color); /* Set transparent to hide the puzzle outline. */
+      border-radius: 6px;
+      background: rgba(230, 230, 230, 0.42);
+      opacity: 1;
+      transition: opacity 700ms ease, transform 700ms ease, filter 700ms ease;
+      pointer-events: none;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28), 0 20px 50px rgba(0, 0, 0, 0.38);
+    }
+
+    .tile {
+      position: fixed;
+      z-index: 2;
+      width: var(--tile-size);
+      height: var(--tile-size);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 3px;
+      background-image: url("assets/puzzle.jpg");
+      background-repeat: no-repeat;
+      background-size: calc(var(--tile-size) * var(--cols)) calc(var(--tile-size) * var(--rows));
+      box-shadow: var(--tile-shadow);
+      cursor: grab;
+      touch-action: none;
+      transition: box-shadow 160ms ease, opacity 650ms ease, filter 650ms ease, transform 650ms ease;
+      will-change: left, top, transform;
+    }
+
+    .tile:active {
+      cursor: grabbing;
+    }
+
+    .tile.dragging {
+      z-index: 10;
+      box-shadow: 0 20px 44px rgba(26, 28, 24, 0.26);
+      transition: none;
+    }
+
+    .tile.locked {
+      cursor: default;
+      box-shadow: 0 0 0 5px #9dff7a, 0 0 34px rgba(157, 255, 122, 0.78), var(--tile-locked-shadow);
+      pointer-events: none;
+      animation: lock-pop 360ms ease-out;
+    }
+
+    .tile.near {
+      box-shadow: 0 0 0 4px var(--snap-glow), var(--tile-shadow);
+    }
+
+    .snap-burst {
+      position: fixed;
+      z-index: 12;
+      display: grid;
+      place-items: center;
+      width: var(--tile-size);
+      height: var(--tile-size);
+      border: 4px solid #9dff7a;
+      border-radius: 7px;
+      color: #9dff7a;
+      font-size: clamp(2rem, 7vw, 3.4rem);
+      font-weight: 900;
+      line-height: 1;
+      text-shadow: 0 0 14px rgba(157, 255, 122, 0.9);
+      box-shadow: 0 0 0 5px rgba(157, 255, 122, 0.26), 0 0 38px rgba(157, 255, 122, 0.82);
+      pointer-events: none;
+      animation: snap-burst 560ms ease-out forwards;
+    }
+
+    @keyframes lock-pop {
+      0% {
+        transform: scale(1);
+      }
+
+      45% {
+        transform: scale(1.1);
+      }
+
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    @keyframes snap-burst {
+      0% {
+        opacity: 0;
+        transform: scale(0.78);
+      }
+
+      20% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 0;
+        transform: scale(1.24);
+      }
+    }
+
+    .celebration {
+      z-index: 4;
+      display: grid;
+      place-items: end center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 650ms ease;
+    }
+
+    .celebration span {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.76);
+      color: #22231f;
+      font-size: 0.85rem;
+      font-weight: 650;
+      letter-spacing: 0;
+      box-shadow: 0 10px 28px rgba(26, 28, 24, 0.12);
+      backdrop-filter: blur(12px);
+      transform: translateY(18px);
+    }
+
+    .solved .video-frame {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+      filter: saturate(1) brightness(1);
+    }
+
+    .solved .puzzle-board {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(1.018);
+      filter: blur(8px);
+    }
+
+    .solved .tile {
+      opacity: 0;
+      filter: blur(8px);
+      transform: scale(1.02);
+    }
+
+    .solved .celebration {
+      opacity: 1;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        overflow: hidden;
+      }
+
+      .app {
+        padding: 16px 12px 20px;
+        gap: 10px;
+      }
+
+      .video-frame,
+      .celebration {
+        width: min(82vw, 70vh, 360px);
+      }
+
+      .puzzle-board {
+        width: min(78vw, 60vh, 360px);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" id="app">
+    <h1>Put me together<br>to find the hidden prize.</h1>
+    <section class="stage" id="stage" aria-label="Image puzzle">
+      <div class="video-frame" aria-hidden="true">
+        <video id="prizeVideo" playsinline controls preload="metadata">
+          <source src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" type="video/mp4">
+        </video>
+      </div>
+      <div class="puzzle-board" id="board" aria-hidden="true"></div>
+      <div class="celebration" aria-live="polite"><span>Prize unlocked</span></div>
+    </section>
+  </main>
+
+  <script>
+    /*
+      Grid size: change COLS and ROWS to adjust the puzzle.
+      Fewer rows/columns make larger, easier pieces.
+    */
+    const COLS = 3;
+    const ROWS = 4;
+
+    /*
+      Video URL: replace this temporary online MP4 with your final 9:16 video.
+      Keep it as an MP4 or update the <source type> above if using another format.
+    */
+    const VIDEO_URL = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+
+    /*
+      Outline visibility: edit --outline-color in CSS to make the guide stronger,
+      fainter, or transparent.
+    */
+
+    const app = document.getElementById("app");
+    const stage = document.getElementById("stage");
+    const board = document.getElementById("board");
+    const video = document.getElementById("prizeVideo");
+    const source = video.querySelector("source");
+
+    let boardRect = null;
+    let tileSize = 0;
+    let lockedCount = 0;
+    let activeTile = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    source.src = VIDEO_URL;
+    video.load();
+
+    function shuffle(items) {
+      const copy = [...items];
+      for (let i = copy.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function updateMeasurements() {
+      boardRect = board.getBoundingClientRect();
+      tileSize = boardRect.width / COLS;
+      document.documentElement.style.setProperty("--tile-size", `${tileSize}px`);
+      document.documentElement.style.setProperty("--cols", COLS);
+      document.documentElement.style.setProperty("--rows", ROWS);
+
+      document.querySelectorAll(".tile").forEach((tile) => {
+        const col = Number(tile.dataset.col);
+        const row = Number(tile.dataset.row);
+        tile.style.backgroundPosition = `${-col * tileSize}px ${-row * tileSize}px`;
+        if (tile.dataset.locked === "true") {
+          placeTile(tile, boardRect.left + col * tileSize, boardRect.top + row * tileSize);
+        }
+      });
+    }
+
+    function placeTile(tile, left, top) {
+      tile.style.left = `${left}px`;
+      tile.style.top = `${top}px`;
+    }
+
+    function randomPointAwayFromTarget(targetX, targetY) {
+      const margin = Math.max(12, tileSize * 0.35);
+      const maxX = window.innerWidth - tileSize - margin;
+      const maxY = window.innerHeight - tileSize - margin;
+      let x = margin;
+      let y = margin;
+
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        x = margin + Math.random() * Math.max(1, maxX - margin);
+        y = margin + Math.random() * Math.max(1, maxY - margin);
+        const distance = Math.hypot(x - targetX, y - targetY);
+        if (distance > tileSize * 1.8) break;
+      }
+
+      return { x, y };
+    }
+
+    function buildPuzzle() {
+      lockedCount = 0;
+      document.querySelectorAll(".tile").forEach((tile) => tile.remove());
+      updateMeasurements();
+
+      const pieces = [];
+      for (let row = 0; row < ROWS; row += 1) {
+        for (let col = 0; col < COLS; col += 1) {
+          pieces.push({ row, col });
+        }
+      }
+
+      shuffle(pieces).forEach(({ row, col }) => {
+        const tile = document.createElement("button");
+        tile.className = "tile";
+        tile.type = "button";
+        tile.setAttribute("aria-label", `Puzzle piece ${row * COLS + col + 1}`);
+        tile.dataset.row = row;
+        tile.dataset.col = col;
+        tile.dataset.locked = "false";
+        tile.style.backgroundPosition = `${-col * tileSize}px ${-row * tileSize}px`;
+
+        const targetX = boardRect.left + col * tileSize;
+        const targetY = boardRect.top + row * tileSize;
+        const point = randomPointAwayFromTarget(targetX, targetY);
+        placeTile(tile, point.x, point.y);
+        tile.addEventListener("pointerdown", startDrag);
+        stage.appendChild(tile);
+      });
+    }
+
+    function startDrag(event) {
+      const tile = event.currentTarget;
+      if (tile.dataset.locked === "true" || app.classList.contains("solved")) return;
+
+      activeTile = tile;
+      activeTile.classList.add("dragging");
+      activeTile.setPointerCapture(event.pointerId);
+      const rect = activeTile.getBoundingClientRect();
+      dragOffsetX = event.clientX - rect.left;
+      dragOffsetY = event.clientY - rect.top;
+
+      activeTile.addEventListener("pointermove", dragTile);
+      activeTile.addEventListener("pointerup", endDrag, { once: true });
+      activeTile.addEventListener("pointercancel", endDrag, { once: true });
+    }
+
+    function dragTile(event) {
+      if (!activeTile) return;
+
+      const maxLeft = window.innerWidth - tileSize;
+      const maxTop = window.innerHeight - tileSize;
+      const left = Math.min(Math.max(0, event.clientX - dragOffsetX), maxLeft);
+      const top = Math.min(Math.max(0, event.clientY - dragOffsetY), maxTop);
+      placeTile(activeTile, left, top);
+
+      const target = getTarget(activeTile);
+      const distance = Math.hypot(left - target.x, top - target.y);
+      activeTile.classList.toggle("near", distance <= tileSize * 0.45);
+    }
+
+    function endDrag(event) {
+      if (!activeTile) return;
+
+      activeTile.releasePointerCapture(event.pointerId);
+      activeTile.removeEventListener("pointermove", dragTile);
+      activeTile.classList.remove("dragging", "near");
+
+      const rect = activeTile.getBoundingClientRect();
+      const target = getTarget(activeTile);
+      const distance = Math.hypot(rect.left - target.x, rect.top - target.y);
+
+      if (distance <= tileSize * 0.42) {
+        lockTile(activeTile, target);
+      }
+
+      activeTile = null;
+    }
+
+    function getTarget(tile) {
+      return {
+        x: boardRect.left + Number(tile.dataset.col) * tileSize,
+        y: boardRect.top + Number(tile.dataset.row) * tileSize
+      };
+    }
+
+    function lockTile(tile, target) {
+      tile.dataset.locked = "true";
+      tile.classList.add("locked");
+      placeTile(tile, target.x, target.y);
+      showSnapBurst(target);
+      lockedCount += 1;
+
+      if (lockedCount === COLS * ROWS) {
+        window.setTimeout(revealPrize, 260);
+      }
+    }
+
+    function showSnapBurst(target) {
+      const burst = document.createElement("div");
+      burst.className = "snap-burst";
+      burst.textContent = "✓";
+      burst.style.left = `${target.x}px`;
+      burst.style.top = `${target.y}px`;
+      document.body.appendChild(burst);
+      burst.addEventListener("animationend", () => burst.remove(), { once: true });
+    }
+
+    function revealPrize() {
+      app.classList.add("solved");
+      video.play().catch(() => {
+        video.controls = true;
+      });
+    }
+
+    function handleResize() {
+      const previous = new Map();
+      document.querySelectorAll(".tile").forEach((tile) => {
+        previous.set(tile, {
+          leftRatio: tile.offsetLeft / Math.max(1, window.innerWidth),
+          topRatio: tile.offsetTop / Math.max(1, window.innerHeight)
+        });
+      });
+
+      updateMeasurements();
+
+      previous.forEach((pos, tile) => {
+        if (tile.dataset.locked === "true") return;
+        placeTile(
+          tile,
+          Math.min(window.innerWidth - tileSize, pos.leftRatio * window.innerWidth),
+          Math.min(window.innerHeight - tileSize, pos.topRatio * window.innerHeight)
+        );
+      });
+    }
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("load", buildPuzzle);
+  </script>
+</body>
+</html>
