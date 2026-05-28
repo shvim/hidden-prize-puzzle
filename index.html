@@ -53,6 +53,7 @@
       width: min(900px, 100%);
       margin: 0 auto;
       color: #fff;
+      font-family: Georgia, "Times New Roman", Times, serif;
       font-size: clamp(1rem, 2.55vw, 1.95rem);
       font-style: italic;
       font-weight: 800;
@@ -292,8 +293,8 @@
       Grid size: change COLS and ROWS to adjust the puzzle.
       Fewer rows/columns make larger, easier pieces.
     */
-    const COLS = 3;
-    const ROWS = 4;
+    const COLS = 2;
+    const ROWS = 3;
 
     /*
       Video URL: replace this temporary online MP4 with your final 9:16 video.
@@ -375,9 +376,9 @@
         wall frame in assets/room-frame.webp. Adjust if you swap the room image.
       */
       const frame = {
-        left: 0.465,
+        left: 0.468,
         top: 0.136,
-        width: 0.402
+        width: 0.348
       };
 
       const stageRect = stage.getBoundingClientRect();
