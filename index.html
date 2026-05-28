@@ -75,7 +75,7 @@
       left: var(--frame-left);
       top: var(--frame-top);
       width: var(--frame-width);
-      aspect-ratio: var(--cols) / var(--rows);
+      height: var(--frame-height);
     }
 
     .puzzle-board {
@@ -83,7 +83,7 @@
       left: var(--frame-left);
       top: var(--frame-top);
       width: var(--frame-width);
-      aspect-ratio: var(--cols) / var(--rows);
+      height: var(--frame-height);
     }
 
     .video-frame {
@@ -119,13 +119,13 @@
     .tile {
       position: fixed;
       z-index: 2;
-      width: var(--tile-size);
-      height: var(--tile-size);
+      width: var(--tile-width);
+      height: var(--tile-height);
       border: 1px solid rgba(255, 255, 255, 0.5);
       border-radius: 3px;
       background-image: url("assets/puzzle.jpg");
       background-repeat: no-repeat;
-      background-size: calc(var(--tile-size) * var(--cols)) calc(var(--tile-size) * var(--rows));
+      background-size: calc(var(--tile-width) * var(--cols)) calc(var(--tile-height) * var(--rows));
       box-shadow: var(--tile-shadow);
       cursor: grab;
       touch-action: none;
@@ -159,8 +159,8 @@
       z-index: 12;
       display: grid;
       place-items: center;
-      width: var(--tile-size);
-      height: var(--tile-size);
+      width: var(--tile-width);
+      height: var(--tile-height);
       border: 2px solid #9dff7a;
       border-radius: 7px;
       color: #9dff7a;
@@ -314,7 +314,8 @@
     const source = video.querySelector("source");
 
     let boardRect = null;
-    let tileSize = 0;
+    let tileWidth = 0;
+    let tileHeight = 0;
     let lockedCount = 0;
     let activeTile = null;
     let dragOffsetX = 0;
@@ -335,17 +336,19 @@
     function updateMeasurements() {
       updateFramePlacement();
       boardRect = board.getBoundingClientRect();
-      tileSize = boardRect.width / COLS;
-      document.documentElement.style.setProperty("--tile-size", `${tileSize}px`);
+      tileWidth = boardRect.width / COLS;
+      tileHeight = boardRect.height / ROWS;
+      document.documentElement.style.setProperty("--tile-width", `${tileWidth}px`);
+      document.documentElement.style.setProperty("--tile-height", `${tileHeight}px`);
       document.documentElement.style.setProperty("--cols", COLS);
       document.documentElement.style.setProperty("--rows", ROWS);
 
       document.querySelectorAll(".tile").forEach((tile) => {
         const col = Number(tile.dataset.col);
         const row = Number(tile.dataset.row);
-        tile.style.backgroundPosition = `${-col * tileSize}px ${-row * tileSize}px`;
+        tile.style.backgroundPosition = `${-col * tileWidth}px ${-row * tileHeight}px`;
         if (tile.dataset.locked === "true") {
-          placeTile(tile, boardRect.left + col * tileSize, boardRect.top + row * tileSize);
+          placeTile(tile, boardRect.left + col * tileWidth, boardRect.top + row * tileHeight);
         }
       });
     }
@@ -372,23 +375,27 @@
       }
 
       /*
-        Frame placement: these percentages map the puzzle/video onto the empty
-        wall frame in assets/room-frame.webp. Adjust if you swap the room image.
+        Frame placement: measured from assets/room-frame.webp, whose source
+        image is 637 x 900. These values map the puzzle/video to the inside of
+        the black wall frame.
       */
       const frame = {
-        left: 0.452,
-        top: 0.136,
-        width: 0.392
+        left: 290 / 637,
+        top: 127 / 900,
+        width: 236 / 637,
+        height: 333 / 900
       };
 
       const stageRect = stage.getBoundingClientRect();
       const left = offsetX + renderWidth * frame.left - stageRect.left;
       const top = offsetY + renderHeight * frame.top - stageRect.top;
       const width = renderWidth * frame.width;
+      const height = renderHeight * frame.height;
 
       stage.style.setProperty("--frame-left", `${left}px`);
       stage.style.setProperty("--frame-top", `${top}px`);
       stage.style.setProperty("--frame-width", `${width}px`);
+      stage.style.setProperty("--frame-height", `${height}px`);
     }
 
     function placeTile(tile, left, top) {
@@ -397,9 +404,9 @@
     }
 
     function randomPointAwayFromTarget(targetX, targetY) {
-      const margin = Math.max(12, tileSize * 0.35);
-      const maxX = window.innerWidth - tileSize - margin;
-      const maxY = window.innerHeight - tileSize - margin;
+      const margin = Math.max(12, Math.min(tileWidth, tileHeight) * 0.35);
+      const maxX = window.innerWidth - tileWidth - margin;
+      const maxY = window.innerHeight - tileHeight - margin;
       let x = margin;
       let y = margin;
 
@@ -407,7 +414,7 @@
         x = margin + Math.random() * Math.max(1, maxX - margin);
         y = margin + Math.random() * Math.max(1, maxY - margin);
         const distance = Math.hypot(x - targetX, y - targetY);
-        if (distance > tileSize * 1.8) break;
+        if (distance > Math.min(tileWidth, tileHeight) * 1.8) break;
       }
 
       return { x, y };
@@ -433,10 +440,10 @@
         tile.dataset.row = row;
         tile.dataset.col = col;
         tile.dataset.locked = "false";
-        tile.style.backgroundPosition = `${-col * tileSize}px ${-row * tileSize}px`;
+        tile.style.backgroundPosition = `${-col * tileWidth}px ${-row * tileHeight}px`;
 
-        const targetX = boardRect.left + col * tileSize;
-        const targetY = boardRect.top + row * tileSize;
+        const targetX = boardRect.left + col * tileWidth;
+        const targetY = boardRect.top + row * tileHeight;
         const point = randomPointAwayFromTarget(targetX, targetY);
         placeTile(tile, point.x, point.y);
         tile.addEventListener("pointerdown", startDrag);
@@ -463,15 +470,15 @@
     function dragTile(event) {
       if (!activeTile) return;
 
-      const maxLeft = window.innerWidth - tileSize;
-      const maxTop = window.innerHeight - tileSize;
+      const maxLeft = window.innerWidth - tileWidth;
+      const maxTop = window.innerHeight - tileHeight;
       const left = Math.min(Math.max(0, event.clientX - dragOffsetX), maxLeft);
       const top = Math.min(Math.max(0, event.clientY - dragOffsetY), maxTop);
       placeTile(activeTile, left, top);
 
       const target = getTarget(activeTile);
       const distance = Math.hypot(left - target.x, top - target.y);
-      activeTile.classList.toggle("near", distance <= tileSize * 0.45);
+      activeTile.classList.toggle("near", distance <= Math.min(tileWidth, tileHeight) * 0.45);
     }
 
     function endDrag(event) {
@@ -485,7 +492,7 @@
       const target = getTarget(activeTile);
       const distance = Math.hypot(rect.left - target.x, rect.top - target.y);
 
-      if (distance <= tileSize * 0.42) {
+      if (distance <= Math.min(tileWidth, tileHeight) * 0.42) {
         lockTile(activeTile, target);
       }
 
@@ -494,8 +501,8 @@
 
     function getTarget(tile) {
       return {
-        x: boardRect.left + Number(tile.dataset.col) * tileSize,
-        y: boardRect.top + Number(tile.dataset.row) * tileSize
+        x: boardRect.left + Number(tile.dataset.col) * tileWidth,
+        y: boardRect.top + Number(tile.dataset.row) * tileHeight
       };
     }
 
@@ -543,8 +550,8 @@
         if (tile.dataset.locked === "true") return;
         placeTile(
           tile,
-          Math.min(window.innerWidth - tileSize, pos.leftRatio * window.innerWidth),
-          Math.min(window.innerHeight - tileSize, pos.topRatio * window.innerHeight)
+          Math.min(window.innerWidth - tileWidth, pos.leftRatio * window.innerWidth),
+          Math.min(window.innerHeight - tileHeight, pos.topRatio * window.innerHeight)
         );
       });
     }
