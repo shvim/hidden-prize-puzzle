@@ -571,6 +571,8 @@
 
     function revealPrize() {
       app.classList.add("solved");
+      video.muted = false;
+      video.volume = 1;
       video.play().catch(() => {
         video.controls = true;
       });
