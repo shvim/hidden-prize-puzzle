@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hidden Prize Puzzle</title>
+  <style>
+    :root {
+      --bg: #f6f7f4;
+      --ink: #1c1d1c;
+      --muted: #7b7f78;
+      --tile-shadow: 0 14px 30px rgba(26, 28, 24, 0.18);
+      --tile-locked-shadow: 0 4px 12px rgba(26, 28, 24, 0.08);
+      --outline-color: rgba(238, 238, 238, 0.95); /* Change outline visibility/color here. */
+      --snap-glow: rgba(240, 227, 181, 0.72);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+    }
+
+    body {
+      overflow: hidden;
+      background: #000;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .app {
+      position: relative;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      width: 100vw;
+      height: 100dvh;
+      padding: clamp(14px, 2.4vw, 28px);
+      gap: clamp(8px, 1.2vh, 14px);
+      background-image: linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18)), url("../assets/room-frame.webp");
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-size: var(--room-fit, cover);
+    }
+
+    h1 {
+      z-index: 3;
+      width: min(900px, 100%);
+      margin: 0 auto;
+      color: #fff;
+      font-family: Georgia, "Times New Roman", Times, serif;
+      font-size: clamp(1rem, 2.55vw, 1.95rem);
+      font-style: italic;
+      font-weight: 800;
+      letter-spacing: 0;
+      line-height: 1.18;
+      text-align: center;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.52);
+    }
+
+    .stage {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .video-frame,
+    .expand-callout {
+      position: absolute;
+      left: var(--frame-left);
+      top: var(--frame-top);
+      width: var(--frame-width);
+      height: var(--frame-height);
+    }
+
+    .puzzle-board {
+      position: absolute;
+      left: var(--frame-left);
+      top: var(--frame-top);
+      width: var(--frame-width);
+      height: var(--frame-height);
+    }
+
+    .video-frame {
+      z-index: 0;
+      overflow: hidden;
+      border-radius: 4px;
+      opacity: 0;
+      transform: scale(0.98);
+      transition: opacity 850ms ease, transform 850ms ease, filter 850ms ease;
+      filter: saturate(0.88) brightness(0.94);
+      background: #111;
+      box-shadow: 0 18px 48px rgba(26, 28, 24, 0.18);
+    }
+
+    .video-frame video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .puzzle-board {
+      z-index: 1;
+      border: 5px solid var(--outline-color); /* Set transparent to hide the puzzle outline. */
+      border-radius: 6px;
+      background: rgba(230, 230, 230, 0.42);
+      opacity: 1;
+      transition: opacity 700ms ease, transform 700ms ease, filter 700ms ease;
+      pointer-events: none;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28), 0 20px 50px rgba(0, 0, 0, 0.38);
+    }
+
+    .tile {
+      position: fixed;
+      z-index: 2;
+      width: var(--tile-width);
+      height: var(--tile-height);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 3px;
+      background-image: url("../assets/puzzle.jpg");
+      background-repeat: no-repeat;
+      background-size: calc(var(--tile-width) * var(--cols)) calc(var(--tile-height) * var(--rows));
+      box-shadow: var(--tile-shadow);
+      cursor: grab;
+      touch-action: none;
+      transition: box-shadow 160ms ease, opacity 650ms ease, filter 650ms ease, transform 650ms ease;
+      will-change: left, top, transform;
+    }
+
+    .tile:active {
+      cursor: grabbing;
+    }
+
+    .tile.dragging {
+      z-index: 10;
+      box-shadow: 0 20px 44px rgba(26, 28, 24, 0.26);
+      transition: none;
+    }
+
+    .tile.locked {
+      cursor: default;
+      box-shadow: var(--tile-locked-shadow);
+      pointer-events: none;
+      animation: lock-pop 360ms ease-out;
+    }
+
+    .tile.near {
+      box-shadow: 0 0 0 4px var(--snap-glow), var(--tile-shadow);
+    }
+
+    .snap-burst {
+      position: fixed;
+      z-index: 12;
+      display: grid;
+      place-items: center;
+      width: var(--tile-width);
+      height: var(--tile-height);
+      border: 2px solid #9dff7a;
+      border-radius: 7px;
+      color: #9dff7a;
+      font-size: clamp(2rem, 7vw, 3.4rem);
+      font-weight: 900;
+      line-height: 1;
+      text-shadow: 0 0 14px rgba(157, 255, 122, 0.9);
+      box-shadow: 0 0 0 3px rgba(157, 255, 122, 0.22), 0 0 26px rgba(157, 255, 122, 0.72);
+      pointer-events: none;
+      animation: snap-burst 560ms ease-out forwards;
+    }
+
+    @keyframes lock-pop {
+      0% {
+        transform: scale(1);
+      }
+
+      45% {
+        transform: scale(1.1);
+      }
+
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    @keyframes snap-burst {
+      0% {
+        opacity: 0;
+        transform: scale(0.78);
+      }
+
+      20% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 0;
+        transform: scale(1.24);
+      }
+    }
+
+    .expand-callout {
+      z-index: 4;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 650ms ease;
+    }
+
+    .expand-callout span {
+      position: absolute;
+      right: calc(100% + 14px);
+      top: 5%;
+      width: max-content;
+      color: #ff2a18;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: clamp(0.8rem, 2.5vw, 1.1rem);
+      font-weight: 850;
+      letter-spacing: 0;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+      text-transform: uppercase;
+    }
+
+    .expand-callout::after {
+      content: "";
+      position: absolute;
+      left: -42%;
+      top: 8%;
+      width: 48%;
+      height: 2px;
+      background: #ff2a18;
+      transform: rotate(9deg);
+      transform-origin: right center;
+      box-shadow: 0 0 10px rgba(255, 42, 24, 0.45);
+    }
+
+    .expand-callout::before {
+      content: "";
+      position: absolute;
+      left: 9px;
+      top: calc(8% - 5px);
+      width: 0;
+      height: 0;
+      border-left: 11px solid #ff2a18;
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+      transform: rotate(9deg);
+    }
+
+    .assembled .tile.locked {
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    .solved .video-frame {
+      opacity: 1;
+      transform: scale(1);
+      filter: saturate(1) brightness(1);
+    }
+
+    .solved .puzzle-board {
+      opacity: 0;
+      transform: scale(1.018);
+      filter: blur(8px);
+    }
+
+    .solved .tile {
+      opacity: 0;
+      filter: blur(8px);
+      transform: scale(1.02);
+    }
+
+    .solved .expand-callout {
+      opacity: 1;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        overflow: hidden;
+      }
+
+      .app {
+        padding: 16px 12px 20px;
+        gap: 10px;
+      }
+
+      h1 {
+        font-size: clamp(1rem, 4.35vw, 1.42rem);
+      }
+
+      .expand-callout span {
+        right: calc(100% + 10px);
+        font-size: 0.72rem;
+      }
+
+      .expand-callout::after {
+        left: -39%;
+        width: 45%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" id="app">
+    <h1>Every piece a step<br>Toward something worth the patience<br>What waits, waits for you</h1>
+    <section class="stage" id="stage" aria-label="Image puzzle">
+      <div class="video-frame" aria-hidden="true">
+        <video id="prizeVideo" playsinline controls preload="none">
+          <source data-src="../assets/i-do.mp4" type="video/mp4">
+        </video>
+      </div>
+      <div class="puzzle-board" id="board" aria-hidden="true"></div>
+      <div class="expand-callout" aria-hidden="true"><span>expand video</span></div>
+    </section>
+  </main>
+
+  <script>
+    /*
+      Grid size: change COLS and ROWS to adjust the puzzle.
+      Fewer rows/columns make larger, easier pieces.
+    */
+    const COLS = 3;
+    const ROWS = 4;
+
+    /*
+      Video URL: replace this temporary online MP4 with your final 9:16 video.
+      Keep it as an MP4 or update the <source type> above if using another format.
+    */
+    const VIDEO_URL = "../assets/i-do.mp4";
+
+    /*
+      Outline visibility: edit --outline-color in CSS to make the guide stronger,
+      fainter, or transparent.
+    */
+
+    const app = document.getElementById("app");
+    const stage = document.getElementById("stage");
+    const board = document.getElementById("board");
+    const video = document.getElementById("prizeVideo");
+    const source = video.querySelector("source");
+
+    let boardRect = null;
+    let tileWidth = 0;
+    let tileHeight = 0;
+    let lockedCount = 0;
+    let activeTile = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    video.removeAttribute("src");
+
+    function shuffle(items) {
+      const copy = [...items];
+      for (let i = copy.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function updateMeasurements() {
+      updateFramePlacement();
+      boardRect = board.getBoundingClientRect();
+      tileWidth = boardRect.width / COLS;
+      tileHeight = boardRect.height / ROWS;
+      document.documentElement.style.setProperty("--tile-width", `${tileWidth}px`);
+      document.documentElement.style.setProperty("--tile-height", `${tileHeight}px`);
+      document.documentElement.style.setProperty("--cols", COLS);
+      document.documentElement.style.setProperty("--rows", ROWS);
+
+      document.querySelectorAll(".tile").forEach((tile) => {
+        const col = Number(tile.dataset.col);
+        const row = Number(tile.dataset.row);
+        tile.style.backgroundPosition = `${-col * tileWidth}px ${-row * tileHeight}px`;
+        if (tile.dataset.locked === "true") {
+          placeTile(tile, boardRect.left + col * tileWidth, boardRect.top + row * tileHeight);
+        }
+      });
+    }
+
+    function updateFramePlacement() {
+      const imageRatio = 637 / 900;
+      const viewportRatio = window.innerWidth / window.innerHeight;
+      let renderWidth = window.innerWidth;
+      let renderHeight = window.innerHeight;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      const shouldContainRoom = viewportRatio > imageRatio;
+      app.style.setProperty("--room-fit", shouldContainRoom ? "contain" : "cover");
+
+      if (shouldContainRoom) {
+        renderHeight = window.innerHeight;
+        renderWidth = renderHeight * imageRatio;
+        offsetX = (window.innerWidth - renderWidth) / 2;
+      } else {
+        renderHeight = window.innerHeight;
+        renderWidth = renderHeight * imageRatio;
+        offsetX = (window.innerWidth - renderWidth) / 2;
+      }
+
+      /*
+        Frame placement: measured from ../assets/room-frame.webp, whose source
+        image is 637 x 900. These values map the puzzle/video to the inside of
+        the black wall frame.
+      */
+      const frame = {
+        left: 290 / 637,
+        top: 127 / 900,
+        width: 236 / 637,
+        height: 333 / 900
+      };
+
+      const stageRect = stage.getBoundingClientRect();
+      const left = offsetX + renderWidth * frame.left - stageRect.left;
+      const top = offsetY + renderHeight * frame.top - stageRect.top;
+      const width = renderWidth * frame.width;
+      const height = renderHeight * frame.height;
+
+      stage.style.setProperty("--frame-left", `${left}px`);
+      stage.style.setProperty("--frame-top", `${top}px`);
+      stage.style.setProperty("--frame-width", `${width}px`);
+      stage.style.setProperty("--frame-height", `${height}px`);
+    }
+
+    function placeTile(tile, left, top) {
+      tile.style.left = `${left}px`;
+      tile.style.top = `${top}px`;
+    }
+
+    function randomPointAwayFromTarget(targetX, targetY) {
+      const margin = Math.max(12, Math.min(tileWidth, tileHeight) * 0.35);
+      const maxX = window.innerWidth - tileWidth - margin;
+      const maxY = window.innerHeight - tileHeight - margin;
+      let x = margin;
+      let y = margin;
+
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        x = margin + Math.random() * Math.max(1, maxX - margin);
+        y = margin + Math.random() * Math.max(1, maxY - margin);
+        const distance = Math.hypot(x - targetX, y - targetY);
+        if (distance > Math.min(tileWidth, tileHeight) * 1.8) break;
+      }
+
+      return { x, y };
+    }
+
+    function buildPuzzle() {
+      lockedCount = 0;
+      document.querySelectorAll(".tile").forEach((tile) => tile.remove());
+      updateMeasurements();
+
+      const pieces = [];
+      for (let row = 0; row < ROWS; row += 1) {
+        for (let col = 0; col < COLS; col += 1) {
+          pieces.push({ row, col });
+        }
+      }
+
+      shuffle(pieces).forEach(({ row, col }) => {
+        const tile = document.createElement("button");
+        tile.className = "tile";
+        tile.type = "button";
+        tile.setAttribute("aria-label", `Puzzle piece ${row * COLS + col + 1}`);
+        tile.dataset.row = row;
+        tile.dataset.col = col;
+        tile.dataset.locked = "false";
+        tile.style.backgroundPosition = `${-col * tileWidth}px ${-row * tileHeight}px`;
+
+        const targetX = boardRect.left + col * tileWidth;
+        const targetY = boardRect.top + row * tileHeight;
+        const point = randomPointAwayFromTarget(targetX, targetY);
+        placeTile(tile, point.x, point.y);
+        tile.addEventListener("pointerdown", startDrag);
+        stage.appendChild(tile);
+      });
+    }
+
+    function startDrag(event) {
+      const tile = event.currentTarget;
+      if (tile.dataset.locked === "true" || app.classList.contains("solved")) return;
+
+      activeTile = tile;
+      activeTile.classList.add("dragging");
+      activeTile.setPointerCapture(event.pointerId);
+      const rect = activeTile.getBoundingClientRect();
+      dragOffsetX = event.clientX - rect.left;
+      dragOffsetY = event.clientY - rect.top;
+
+      activeTile.addEventListener("pointermove", dragTile);
+      activeTile.addEventListener("pointerup", endDrag, { once: true });
+      activeTile.addEventListener("pointercancel", endDrag, { once: true });
+    }
+
+    function dragTile(event) {
+      if (!activeTile) return;
+
+      const maxLeft = window.innerWidth - tileWidth;
+      const maxTop = window.innerHeight - tileHeight;
+      const left = Math.min(Math.max(0, event.clientX - dragOffsetX), maxLeft);
+      const top = Math.min(Math.max(0, event.clientY - dragOffsetY), maxTop);
+      placeTile(activeTile, left, top);
+
+      const target = getTarget(activeTile);
+      const distance = Math.hypot(left - target.x, top - target.y);
+      activeTile.classList.toggle("near", distance <= Math.min(tileWidth, tileHeight) * 0.45);
+    }
+
+    function endDrag(event) {
+      if (!activeTile) return;
+
+      activeTile.releasePointerCapture(event.pointerId);
+      activeTile.removeEventListener("pointermove", dragTile);
+      activeTile.classList.remove("dragging", "near");
+
+      const rect = activeTile.getBoundingClientRect();
+      const target = getTarget(activeTile);
+      const distance = Math.hypot(rect.left - target.x, rect.top - target.y);
+
+      if (distance <= Math.min(tileWidth, tileHeight) * 0.42) {
+        lockTile(activeTile, target);
+      }
+
+      activeTile = null;
+    }
+
+    function getTarget(tile) {
+      return {
+        x: boardRect.left + Number(tile.dataset.col) * tileWidth,
+        y: boardRect.top + Number(tile.dataset.row) * tileHeight
+      };
+    }
+
+    function lockTile(tile, target) {
+      tile.dataset.locked = "true";
+      tile.classList.add("locked");
+      placeTile(tile, target.x, target.y);
+      showSnapBurst(target);
+      lockedCount += 1;
+
+      if (lockedCount === COLS * ROWS) {
+        app.classList.add("assembled");
+        window.setTimeout(revealPrize, 2000);
+      }
+    }
+
+    function showSnapBurst(target) {
+      const burst = document.createElement("div");
+      burst.className = "snap-burst";
+      burst.textContent = "✓";
+      burst.style.left = `${target.x}px`;
+      burst.style.top = `${target.y}px`;
+      document.body.appendChild(burst);
+      burst.addEventListener("animationend", () => burst.remove(), { once: true });
+    }
+
+    function revealPrize() {
+      app.classList.add("solved");
+      if (!source.src) {
+        source.src = VIDEO_URL;
+        video.load();
+      }
+      video.muted = false;
+      video.volume = 1;
+      video.play().catch(() => {
+        video.controls = true;
+      });
+    }
+
+    function handleResize() {
+      const previous = new Map();
+      document.querySelectorAll(".tile").forEach((tile) => {
+        previous.set(tile, {
+          leftRatio: tile.offsetLeft / Math.max(1, window.innerWidth),
+          topRatio: tile.offsetTop / Math.max(1, window.innerHeight)
+        });
+      });
+
+      updateMeasurements();
+
+      previous.forEach((pos, tile) => {
+        if (tile.dataset.locked === "true") return;
+        placeTile(
+          tile,
+          Math.min(window.innerWidth - tileWidth, pos.leftRatio * window.innerWidth),
+          Math.min(window.innerHeight - tileHeight, pos.topRatio * window.innerHeight)
+        );
+      });
+    }
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("load", buildPuzzle);
+  </script>
+</body>
+</html>
