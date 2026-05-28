@@ -52,12 +52,13 @@
       z-index: 3;
       width: min(900px, 100%);
       margin: 0 auto;
-      color: #8f18ff;
-      font-size: clamp(1.65rem, 4vw, 3.25rem);
-      font-weight: 760;
+      color: #fff;
+      font-size: clamp(1.18rem, 3.2vw, 2.35rem);
+      font-weight: 720;
       letter-spacing: 0;
-      line-height: 1.12;
+      line-height: 1.18;
       text-align: center;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.52);
     }
 
     .stage {
@@ -255,7 +256,7 @@
       }
 
       h1 {
-        font-size: clamp(1.35rem, 6.8vw, 2.35rem);
+        font-size: clamp(1.18rem, 5.35vw, 1.78rem);
       }
     }
 
@@ -273,7 +274,7 @@
 </head>
 <body>
   <main class="app" id="app">
-    <h1>Put me together<br>to find the hidden prize.</h1>
+    <h1>Every piece a step<br>Toward something worth the patience<br>What waits, waits for you</h1>
     <section class="stage" id="stage" aria-label="Image puzzle">
       <div class="video-frame" aria-hidden="true">
         <video id="prizeVideo" playsinline controls preload="metadata">
@@ -373,9 +374,9 @@
         wall frame in assets/room-frame.webp. Adjust if you swap the room image.
       */
       const frame = {
-        left: 0.457,
-        top: 0.142,
-        width: 0.358
+        left: 0.448,
+        top: 0.136,
+        width: 0.384
       };
 
       const stageRect = stage.getBoundingClientRect();
